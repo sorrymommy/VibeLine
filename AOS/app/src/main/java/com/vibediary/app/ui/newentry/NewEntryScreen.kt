@@ -94,7 +94,7 @@ import com.vibediary.app.ui.components.EntryPhoto
 import com.vibediary.app.ui.components.StationDot
 
 @Composable
-fun NewEntryScreen(start: CaptureMode, onClose: () -> Unit, vm: NewEntryViewModel = viewModel()) {
+fun NewEntryScreen(start: CaptureMode, appLocked: Boolean, onClose: () -> Unit, vm: NewEntryViewModel = viewModel()) {
     val focus = remember { FocusRequester() }
 
     val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -212,7 +212,8 @@ fun NewEntryScreen(start: CaptureMode, onClose: () -> Unit, vm: NewEntryViewMode
         )
     }
 
-    vm.moveChoice?.let { choice ->
+    // Arrives after a location lookup, possibly behind the PIN gate; it would open above the gate.
+    vm.moveChoice?.takeUnless { appLocked }?.let { choice ->
         MoveChoiceDialog(
             choice = choice,
             onStart = { vm.saveAt(useNow = false, onSaved = onClose) },

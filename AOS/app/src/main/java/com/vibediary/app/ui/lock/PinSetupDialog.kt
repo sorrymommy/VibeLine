@@ -52,7 +52,11 @@ fun PinSetupDialog(action: PinAction, onDone: (Boolean) -> Unit) {
 
     Dialog(
         onDismissRequest = { onDone(false) },
-        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+        properties = DialogProperties(
+            dismissOnClickOutside = false,
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+        ),
     ) {
         DarkSystemBarIcons()
         Box {

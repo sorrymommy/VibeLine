@@ -1,6 +1,7 @@
 package com.vibediary.app
 
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import android.graphics.Color
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,7 +40,8 @@ import com.vibediary.app.ui.lock.LockScreen
 class MainActivity : ComponentActivity() {
     /** PIN gate. Up on launch, and again after [AppLock.RELOCK_AFTER_MS] in the background. */
     private val locked = mutableStateOf(false)
-    private var stoppedAt = 0L
+    /** When the app left the screen, on [SystemClock.elapsedRealtime] so changing the clock can't skip the PIN. */
+    private var stoppedAt = NOT_STOPPED
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,6 +53,7 @@ class MainActivity : ComponentActivity() {
         )
         val coldStart = savedInstanceState == null
         locked.value = container.lock.isEnabled && (savedInstanceState?.getBoolean(KEY_LOCKED, true) ?: true)
+        stoppedAt = savedInstanceState?.getLong(KEY_STOPPED_AT, NOT_STOPPED) ?: NOT_STOPPED
         setContent {
             VibeTheme {
                 // Stop the app above the system navigation (back/home) bar so that strip stays
@@ -68,7 +72,7 @@ class MainActivity : ComponentActivity() {
                         composable("new/{mode}") { backStack ->
                             val mode = runCatching { CaptureMode.valueOf(backStack.arguments?.getString("mode").orEmpty()) }
                                 .getOrDefault(CaptureMode.MEMO)
-                            NewEntryScreen(start = mode, onClose = { nav.popBackStack() })
+                            NewEntryScreen(start = mode, appLocked = locked.value, onClose = { nav.popBackStack() })
                         }
                         composable("map") {
                             RouteMapScreen(
@@ -87,19 +91,23 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    if (locked.value) {
-                        LockScreen(onUnlocked = { locked.value = false })
-                    }
-
                     // Tagline under the mark on a cold start, then fade into the timeline.
                     var showLaunch by rememberSaveable { mutableStateOf(coldStart) }
                     LaunchedEffect(Unit) {
                         delay(1400)
                         showLaunch = false
                     }
-                    AnimatedVisibility(visible = showLaunch, enter = EnterTransition.None, exit = fadeOut(tween(400))) {
-                        LaunchScreen()
+                    val launchOverlay = @Composable {
+                        AnimatedVisibility(visible = showLaunch, enter = EnterTransition.None, exit = fadeOut(tween(400))) {
+                            LaunchScreen()
+                        }
                     }
+
+                    // Drawn in both windows: the gate's window covers this one once it appears.
+                    if (locked.value) {
+                        LockScreen(onUnlocked = { locked.value = false }, overlay = launchOverlay)
+                    }
+                    launchOverlay()
                 }
             }
         }
@@ -107,22 +115,31 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        val away = System.currentTimeMillis() - stoppedAt
-        if (stoppedAt > 0 && away >= AppLock.RELOCK_AFTER_MS && container.lock.isEnabled) locked.value = true
+        if (awayTooLong() && container.lock.isEnabled) locked.value = true
+        // Cleared so a later rotation doesn't restore this old trip and lock mid-use.
+        stoppedAt = NOT_STOPPED
     }
 
     override fun onStop() {
         super.onStop()
-        // Short trips (camera, gallery picker, permission screens) don't re-lock.
-        if (!isChangingConfigurations) stoppedAt = System.currentTimeMillis()
+        if (!isChangingConfigurations) stoppedAt = SystemClock.elapsedRealtime()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putBoolean(KEY_LOCKED, locked.value)
+        // Before API 28 this runs ahead of onStop, so stoppedAt isn't set yet when leaving.
+        val leavingNow = stoppedAt == NOT_STOPPED && !isChangingConfigurations
+        outState.putLong(KEY_STOPPED_AT, if (leavingNow) SystemClock.elapsedRealtime() else stoppedAt)
     }
+
+    /** Short trips (camera, gallery picker, permission screens) stay under the limit and don't re-lock. */
+    private fun awayTooLong(): Boolean =
+        stoppedAt != NOT_STOPPED && SystemClock.elapsedRealtime() - stoppedAt >= AppLock.RELOCK_AFTER_MS
 
     private companion object {
         const val KEY_LOCKED = "locked"
+        const val KEY_STOPPED_AT = "stoppedAt"
+        const val NOT_STOPPED = 0L
     }
 }

@@ -30,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -43,24 +44,73 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import com.vibediary.app.R
 import com.vibediary.app.container
 import com.vibediary.app.data.AppLock
+import com.vibediary.app.ui.DarkSystemBarIcons
 import com.vibediary.app.ui.Vibe
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Full-screen gate shown on launch (and after a long time away) while a PIN is set. */
+/**
+ * Full-screen gate shown on launch (and after a long time away) while a PIN is set. It is its
+ * own window because a dialog already open on a screen would otherwise stay above it, usable
+ * without the PIN. A dialog that opens later still lands above this window, so one that opens
+ * without a tap has to wait until the gate is gone. [overlay] draws above the gate, inside that
+ * window.
+ */
 @Composable
-fun LockScreen(onUnlocked: () -> Unit) {
+fun LockScreen(onUnlocked: () -> Unit, overlay: @Composable () -> Unit) {
+    val context = LocalContext.current
+    // Back leaves the app rather than revealing what's behind the gate. Moving to the back, not
+    // finishing, because finishing would throw away a draft on the screen underneath. Started on
+    // top of another app, there is no draft and that app must not go to the back with us.
+    val leaveApp: () -> Unit = {
+        (context as? Activity)?.run { if (!moveTaskToBack(false)) finish() }
+    }
+
+    // The gate's window takes a moment to appear; meanwhile this window's screens stay hidden and
+    // out of reach.
+    Box(
+        Modifier.fillMaxSize().background(Vibe.Paper)
+            .pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent() } }
+    )
+    BackHandler(onBack = leaveApp)
+
+    Dialog(
+        onDismissRequest = leaveApp,
+        properties = DialogProperties(
+            dismissOnClickOutside = false,
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+        ),
+    ) {
+        // Appear at once: a fade-in would leave a dialog underneath visible for its length.
+        val dialogWindow = (LocalView.current.parent as? DialogWindowProvider)?.window
+        SideEffect { dialogWindow?.setWindowAnimations(0) }
+        DarkSystemBarIcons()
+        Box {
+            LockPinPad(onUnlocked)
+            // Same bounds as the activity window's content, so the overlay doesn't jump between them.
+            Box(Modifier.windowInsetsPadding(WindowInsets.navigationBars)) { overlay() }
+        }
+    }
+}
+
+@Composable
+private fun LockPinPad(onUnlocked: () -> Unit) {
     val context = LocalContext.current
     val lock = context.container.lock
     val scope = rememberCoroutineScope()
@@ -76,8 +126,6 @@ fun LockScreen(onUnlocked: () -> Unit) {
             waitMs = lock.waitMillis()
         }
     }
-    // Back on the lock screen leaves the app rather than revealing what's behind it.
-    BackHandler { (context as? Activity)?.finish() }
 
     PinPad(
         title = "비밀번호를 입력해 주세요",
@@ -154,8 +202,6 @@ fun PinPad(
 
     Column(
         modifier.fillMaxSize().background(Vibe.Paper)
-            // Swallow touches so nothing underneath the gate can be reached.
-            .pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent() } }
             .windowInsetsPadding(WindowInsets.statusBars).windowInsetsPadding(WindowInsets.navigationBars)
             .padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
