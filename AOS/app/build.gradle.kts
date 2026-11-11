@@ -12,11 +12,11 @@ val localProps = Properties().apply {
 }
 
 android {
-    namespace = "com.vibediary.app"
+    namespace = "com.vibeline.app"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.vibediary.app"
+        applicationId = "com.vibeline.app"
         minSdk = 26
         targetSdk = 36
         versionCode = 1

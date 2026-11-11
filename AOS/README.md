@@ -1,4 +1,4 @@
-# VibeDiary
+# VibeLine
 
 A map-based diary for capturing a moment as a **photo, memo or voice recording** the instant it comes to mind.
 Voice-to-text and tag extraction both run **entirely on the phone**. Data is stored on the phone and synced
@@ -16,7 +16,7 @@ to a **hidden app-only folder in your Google Drive (appDataFolder)**, so running
 
 ## Code structure
 ```
-app/src/main/java/com/vibediary/app/
+app/src/main/java/com/vibeline/app/
 ├─ data/      Room(Entry), EntryRepository, AppPrefs
 ├─ capture/   AudioRecorder(WAV), Locator(GPS·reverse geocoding)
 ├─ ai/        Transcriber(STT), ImageTagger(ML Kit), TagExtractor(rules), AnalysisWorker
@@ -29,7 +29,7 @@ app/src/main/java/com/vibediary/app/
 ### 1. Google Maps API key
 1. [Google Cloud Console](https://console.cloud.google.com/) → create a project
 2. **APIs & Services → Library → enable "Maps SDK for Android"**
-3. **Credentials → API key**. Restriction: Android apps, package `com.vibediary.app` + SHA-1
+3. **Credentials → API key**. Restriction: Android apps, package `com.vibeline.app` + SHA-1
 4. Add it to `local.properties` in the project root:
    ```
    MAPS_API_KEY=AIza...
@@ -40,7 +40,7 @@ app/src/main/java/com/vibediary/app/
 1. In the same project, **enable "Google Drive API"**
 2. **OAuth consent screen**: External, add your Gmail address as a test user, add scope `.../auth/drive.appdata`
 3. **Credentials → OAuth client ID → type: Android**
-   - Package: `com.vibediary.app`
+   - Package: `com.vibeline.app`
    - SHA-1: output of the command below (debug key)
    ```bash
    keytool -list -v -keystore %USERPROFILE%\.android\debug.keystore -alias androiddebugkey -storepass android -keypass android

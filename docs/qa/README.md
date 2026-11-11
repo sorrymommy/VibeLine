@@ -4,6 +4,7 @@ CLAUDE.md 2번 규칙(수정 후 시니어 개발자 관점의 별도 QA)에 따
 
 | 날짜 | 대상 | 결과 요약 | 문서 |
 |---|---|---|---|
+| 2026-11-12 | 앱 이름을 VibeDiary에서 VibeLine으로 변경 | 패키지(`com.vibeline.app`)·앱 이름·테마·DB·prefs·갤러리 폴더·문구를 바꿈(빌드 통과). QA: 코드 수정 없음. Maps 키 제한과 Drive OAuth 클라이언트를 콘솔에서 새 패키지로 등록해야 함(Major 2), 옛 앱 기록은 드라이브로 옮겨야 함. | [2026-11-12-rename-to-vibeline.md](2026-11-12-rename-to-vibeline.md) |
 | 2026-11-12 | 화면 코드의 숫자 색 4개를 Vibe 팔레트로 옮김 | `InkMuted`·`TrackOff`·`TrackOffInk`·`IconDisabled`를 추가하고 리터럴 6곳을 교체함(값은 같아 화면 변화 없음, 빌드 통과). QA: Nit 2건 중 1건 수정. | [2026-11-12-color-tokens-into-vibe.md](2026-11-12-color-tokens-into-vibe.md) |
 | 2026-10-31 | 잠금 화면 위에서 대화상자를 PIN 없이 조작할 수 있는 문제 | 원인: 잠금 화면이 같은 창의 오버레이라 별도 창인 대화상자가 그 위에 뜸. 잠금 화면을 전체 화면 창으로 옮김(에뮬레이터 재현·확인). QA 2차: Major 2·Minor 6·Nit 다수 수정, 재잠금 순간 몇 프레임의 틈은 수용, 가로 화면 키패드 잘림 등 기존 Minor는 후속으로. | [2026-10-31-lock-screen-own-window.md](2026-10-31-lock-screen-own-window.md) |
 | 2026-10-30 | 프로세스가 정리된 뒤 다시 열면 PIN 잠금을 건너뛰는 문제 | 원인: 앱을 떠난 시각이 프로세스와 함께 사라짐. 저장 상태에 두고 복원 때도 5분 판단(에뮬레이터 재현·확인, 시나리오 7개 통과). QA: Minor 1·Nit 1 수정. 기존 Major 2(재잠금 때 열린 대화상자가 잠금 위에서 조작 가능 — 재현함, 잠금 뒤 화면의 접근성 노출)는 미수정, 후속으로. | [2026-10-30-pin-relock-after-process-death.md](2026-10-30-pin-relock-after-process-death.md) |

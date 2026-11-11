@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- "V 노선": the V of VibeDiary drawn as a route. The two ends are stations already
+<!-- "V 노선": the V of VibeLine drawn as a route. The two ends are stations already
      passed; the filled vertex is the moment you're in. Scaled into the 66dp safe zone. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
