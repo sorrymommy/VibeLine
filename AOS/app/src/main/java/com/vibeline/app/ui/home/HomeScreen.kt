@@ -388,6 +388,9 @@ private fun StationRow(
                 when {
                     entry.analysis == AnalysisState.PENDING ->
                         Text("말한 내용을 글로 옮기는 중이에요", style = MaterialTheme.typography.bodyMedium, color = Vibe.Muted)
+                    // The reason and '다시 분석' live on the detail screen; here it only shouldn't vanish silently.
+                    entry.analysis == AnalysisState.FAILED && entry.transcript.isNullOrBlank() ->
+                        Text("말한 내용을 글로 옮기지 못했어요", style = MaterialTheme.typography.bodyMedium, color = Vibe.Muted)
                     !entry.transcript.isNullOrBlank() ->
                         Text(entry.transcript, style = MaterialTheme.typography.bodyLarge, color = Vibe.Body, maxLines = 4, overflow = TextOverflow.Ellipsis)
                 }

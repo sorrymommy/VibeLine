@@ -12,7 +12,6 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
-import com.vibeline.app.ai.Transcriber
 import com.vibeline.app.capture.AudioRecorder
 import com.vibeline.app.capture.Locator
 import com.vibeline.app.capture.Place
@@ -178,7 +177,6 @@ class NewEntryViewModel(app: Application, private val savedState: SavedStateHand
             recordingError = MIC_UNAVAILABLE
             return false
         }
-        clearTranscript() // the recording is changing, so any earlier text no longer matches it
         recording = true
         paused = false
         recordedMs = audioDurationMs
@@ -222,7 +220,6 @@ class NewEntryViewModel(app: Application, private val savedState: SavedStateHand
             recording = false
             paused = false
             stopping = false
-            transcribe()
         }
     }
 
@@ -231,54 +228,10 @@ class NewEntryViewModel(app: Application, private val savedState: SavedStateHand
     }
 
     fun removeAudio() {
-        clearTranscript()
         audioFile?.let { repo.mediaFile(it).delete() }
         audioFile = null
         audioDurationMs = 0
         levels.clear()
-    }
-
-    // --- transcript (shown before saving) ---
-
-    private var transcribeJob: Job? = null
-
-    /** What was said, once the on-device recognizer has turned the recording into text. */
-    var transcript by mutableStateOf<String?>(null)
-        private set
-    var transcribing by mutableStateOf(false)
-        private set
-    /** Why the text couldn't be produced right now (e.g. language pack missing). */
-    var transcriptProblem by mutableStateOf<Transcriber.Problem?>(null)
-        private set
-
-    /** Turns the finished recording into text right away, so it can be read before 저장. */
-    private fun transcribe() {
-        val file = audioFile?.let { repo.mediaFile(it) } ?: return
-        transcribeJob?.cancel()
-        transcribing = true
-        transcriptProblem = null
-        transcribeJob = viewModelScope.launch {
-            var result = Transcriber.transcribe(getApplication(), file)
-            // The engine may be busy (e.g. analysing the previous entry); one retry usually does it.
-            // Other failures, like a timeout, would only repeat, so they aren't retried.
-            if (result is Transcriber.Result.Unavailable && result.problem == Transcriber.Problem.BUSY) {
-                delay(TRANSCRIBE_RETRY_DELAY_MS)
-                result = Transcriber.transcribe(getApplication(), file)
-            }
-            when (result) {
-                is Transcriber.Result.Text -> transcript = result.text
-                is Transcriber.Result.Unavailable -> transcriptProblem = result.problem
-            }
-            transcribing = false
-        }
-    }
-
-    private fun clearTranscript() {
-        transcribeJob?.cancel()
-        transcribeJob = null
-        transcript = null
-        transcriptProblem = null
-        transcribing = false
     }
 
     // --- save ---
@@ -350,14 +303,10 @@ class NewEntryViewModel(app: Application, private val savedState: SavedStateHand
     }
 
     private suspend fun create(onSaved: () -> Unit) {
-        // Saved before the text was ready: drop it here and let the background analysis
-        // transcribe instead (it does so whenever the transcript is still empty).
-        if (transcribing) clearTranscript()
         val loc = location
         repo.create(
             Entry(
                 note = note.trim(),
-                transcript = transcript,
                 photoFile = photoFile,
                 audioFile = audioFile,
                 audioDurationMs = audioDurationMs,
@@ -386,7 +335,6 @@ class NewEntryViewModel(app: Application, private val savedState: SavedStateHand
         private const val KEY_PENDING_PHOTO = "pendingPhoto"
         private const val KEY_START_HANDLED = "startHandled"
         private const val LEVEL_POLL_MS = 90L
-        private const val TRANSCRIBE_RETRY_DELAY_MS = 1_500L
         private const val MIC_UNAVAILABLE = "지금은 마이크를 쓸 수 없어요. 통화 중이거나 다른 앱이 쓰고 있는지 확인해 주세요"
         private const val MIC_LOST = "녹음을 이어 갈 수 없어 멈췄어요. 여기까지 녹음한 내용은 남아 있어요"
         /** Moving further than this between starting and saving triggers the question. */

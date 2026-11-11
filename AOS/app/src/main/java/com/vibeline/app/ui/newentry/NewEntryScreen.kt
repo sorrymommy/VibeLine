@@ -11,7 +11,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material3.CircularProgressIndicator
 import com.vibeline.app.ai.Transcriber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Surface
@@ -465,7 +464,15 @@ private fun RecordingPanel(vm: NewEntryViewModel, onStart: () -> Unit, modifier:
                 }
                 IconButton(onClick = vm::removeAudio) { Icon(Icons.Filled.Close, "녹음 지우기", tint = Vibe.LeafInk) }
             }
-            TranscriptPreview(vm)
+            // Transcribing takes about half the clip's length, so it runs after 저장 instead of here.
+            Text(
+                when {
+                    !Transcriber.isSupported() -> "이 휴대폰에서는 말을 글로 옮길 수 없어요. 녹음은 그대로 남아요"
+                    Transcriber.isTooLong(vm.audioDurationMs) -> Transcriber.TOO_LONG_REASON
+                    else -> "말한 내용은 저장한 뒤에 글로 옮겨 둘게요"
+                },
+                style = MaterialTheme.typography.bodyMedium, color = Vibe.LeafInk,
+            )
         }
 
         else -> Row(
@@ -479,41 +486,6 @@ private fun RecordingPanel(vm: NewEntryViewModel, onStart: () -> Unit, modifier:
             ) { Icon(Icons.Outlined.Mic, "녹음 시작") }
             Spacer(Modifier.width(14.dp))
             Text("눌러서 말로 남기기", style = MaterialTheme.typography.titleMedium)
-        }
-    }
-}
-
-/** What the recording says, read on-device as soon as recording stops (before 저장). */
-@Composable
-private fun TranscriptPreview(vm: NewEntryViewModel) {
-    val text = vm.transcript
-    val problem = vm.transcriptProblem
-    Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color.White).padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Text("말한 내용", style = MaterialTheme.typography.labelMedium, color = Vibe.LeafInk)
-        when {
-            vm.transcribing -> Row(verticalAlignment = Alignment.CenterVertically) {
-                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = Vibe.Route)
-                Spacer(Modifier.width(8.dp))
-                Text("글로 옮기는 중이에요. 녹음 길이의 절반쯤 걸려요", style = MaterialTheme.typography.bodyMedium, color = Vibe.Muted)
-            }
-            problem != null -> Text(
-                when (problem) {
-                    Transcriber.Problem.UNSUPPORTED ->
-                        "이 휴대폰에서는 말을 글로 옮길 수 없어요. 녹음은 그대로 남아요."
-                    Transcriber.Problem.LANGUAGE_PACK ->
-                        "한국어 음성인식 언어팩이 아직 없어요. 지금 받고 있으니, 저장해 두면 언어팩이 준비된 뒤 기록 화면의 '다시 분석'으로 글로 옮길 수 있어요."
-                    Transcriber.Problem.BUSY, Transcriber.Problem.TEMPORARY ->
-                        "지금은 글로 옮기지 못했어요. 저장하면 다시 옮겨 볼게요."
-                    Transcriber.Problem.TOO_LONG ->
-                        "${Transcriber.TOO_LONG_REASON}. 녹음은 그대로 남아요."
-                },
-                style = MaterialTheme.typography.bodyMedium, color = Vibe.Muted,
-            )
-            text.isNullOrBlank() -> Text("알아들을 수 있는 말이 없었어요", style = MaterialTheme.typography.bodyMedium, color = Vibe.Muted)
-            else -> Text(text, style = MaterialTheme.typography.bodyLarge, color = Vibe.Ink)
         }
     }
 }

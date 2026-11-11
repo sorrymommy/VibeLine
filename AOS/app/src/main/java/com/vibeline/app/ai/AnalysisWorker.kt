@@ -86,12 +86,15 @@ class AnalysisWorker(context: Context, params: WorkerParameters) : CoroutineWork
         }
 
         val wav = repo.mediaFile(audioFile)
+        val startedAt = System.currentTimeMillis()
         var result = Transcriber.transcribe(applicationContext, wav, TRANSCRIBE_BUDGET_MS)
-        // Saving right after the on-screen preview can find the engine still busy with it.
-        // Retry here rather than with Result.retry(), which would redo the gallery export.
+        // Our own entries take turns inside Transcriber, so BUSY means another app holds the engine,
+        // or the session before ours is still shutting down. Retry here rather than with
+        // Result.retry(), which would redo the gallery export; the retry shares the same budget.
         if (result is Transcriber.Result.Unavailable && result.problem == Transcriber.Problem.BUSY) {
             delay(BUSY_RETRY_DELAY_MS)
-            result = Transcriber.transcribe(applicationContext, wav, TRANSCRIBE_BUDGET_MS)
+            val budgetLeftMs = TRANSCRIBE_BUDGET_MS - (System.currentTimeMillis() - startedAt)
+            result = Transcriber.transcribe(applicationContext, wav, budgetLeftMs)
         }
         return when (result) {
             is Transcriber.Result.Text -> Speech(result.text, null, canRetry = false)

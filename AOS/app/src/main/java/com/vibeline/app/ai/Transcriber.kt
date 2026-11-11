@@ -15,6 +15,8 @@ import androidx.annotation.RequiresApi
 import com.vibeline.app.capture.AudioRecorder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
@@ -35,7 +37,7 @@ object Transcriber {
     enum class Problem {
         /** This phone can never do it (Android 12 or lower, no recognition engine). */
         UNSUPPORTED,
-        /** The Korean on-device model is missing; a download has been requested. */
+        /** The Korean on-device model is missing; a download may have been requested, but that isn't confirmed. */
         LANGUAGE_PACK,
         /** The engine is busy with another job right now; retrying shortly usually works. */
         BUSY,
@@ -54,6 +56,9 @@ object Transcriber {
     const val TOO_LONG_REASON = "${MAX_CLIP_MINUTES}분이 넘는 녹음은 글로 옮기지 않아요"
 
     fun isTooLong(durationMs: Long): Boolean = durationMs > MAX_CLIP_MS
+
+    /** Feeding a file to the recognizer needs Android 13 (EXTRA_AUDIO_SOURCE). */
+    fun isSupported(): Boolean = Build.VERSION.SDK_INT >= 33
 
     sealed interface Result {
         data class Text(val text: String) : Result
@@ -75,28 +80,44 @@ object Transcriber {
     private const val TAIL_SILENCE_MS = 1_500
 
     /**
+     * One recognition session at a time: entries saved back to back each start their own worker,
+     * and a second session would only get ERROR_RECOGNIZER_BUSY (or cut the first one short).
+     */
+    private val engineLock = Mutex()
+
+    /**
      * @param budgetMs longest the caller can wait (background workers are stopped after ~10 min).
      */
     suspend fun transcribe(context: Context, wav: File, budgetMs: Long = Long.MAX_VALUE): Result {
-        if (Build.VERSION.SDK_INT < 33) {
-            return Result.Unavailable(Problem.UNSUPPORTED, "음성→텍스트 변환은 Android 13 이상에서 지원됩니다")
+        if (!isSupported()) {
+            return Result.Unavailable(Problem.UNSUPPORTED, "Android 13 이상에서만 말을 글로 옮길 수 있어요")
         }
-        if (!wav.exists()) return Result.Unavailable(Problem.UNSUPPORTED, "녹음 파일이 없습니다")
+        if (!wav.exists()) return Result.Unavailable(Problem.UNSUPPORTED, "녹음 파일을 찾지 못했어요")
         val clipMs = (wav.length() - AudioRecorder.WAV_HEADER_SIZE) * 1000 / AudioRecorder.BYTES_PER_SECOND
         if (isTooLong(clipMs)) return Result.Unavailable(Problem.TOO_LONG, TOO_LONG_REASON)
-        // A slower phone can only keep up with real time (the full pipe throttles the feed),
-        // so wait for that worst case, within the caller's budget.
-        val timeoutMs = minOf(clipMs + TAIL_SILENCE_MS + ENGINE_MARGIN_MS, budgetMs)
-        return withTimeoutOrNull(timeoutMs) {
-            withContext(Dispatchers.Main) { transcribe33(context.applicationContext, wav) }
-        } ?: Result.Unavailable(Problem.TEMPORARY, "음성 변환 시간이 너무 오래 걸렸어요")
+        val queuedAt = System.currentTimeMillis()
+        return engineLock.withLock {
+            // Time spent waiting for an earlier entry counts against the caller's budget too.
+            val budgetLeftMs = budgetMs - (System.currentTimeMillis() - queuedAt)
+            // Starting a clip that can't finish in time would only burn engine time and then fail.
+            val expectedMs = clipMs / FEED_SPEED + TAIL_SILENCE_MS + ENGINE_MARGIN_MS
+            if (expectedMs > budgetLeftMs) {
+                return@withLock Result.Unavailable(Problem.TEMPORARY, "앞선 녹음을 글로 옮기느라 차례가 오지 않았어요")
+            }
+            // A slower phone can only keep up with real time (the full pipe throttles the feed),
+            // so wait for that worst case, within the caller's budget.
+            val timeoutMs = minOf(clipMs + TAIL_SILENCE_MS + ENGINE_MARGIN_MS, budgetLeftMs)
+            withTimeoutOrNull(timeoutMs) {
+                withContext(Dispatchers.Main) { transcribe33(context.applicationContext, wav) }
+            } ?: Result.Unavailable(Problem.TEMPORARY, "글로 옮기는 데 너무 오래 걸렸어요")
+        }
     }
 
     @RequiresApi(33)
     private suspend fun transcribe33(context: Context, wav: File): Result = suspendCancellableCoroutine { cont ->
         val onDevice = SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
         if (!onDevice && !SpeechRecognizer.isRecognitionAvailable(context)) {
-            cont.resume(Result.Unavailable(Problem.UNSUPPORTED, "이 기기에 음성인식 엔진이 없습니다"))
+            cont.resume(Result.Unavailable(Problem.UNSUPPORTED, "이 휴대폰에는 음성인식 엔진이 없어요"))
             return@suspendCancellableCoroutine
         }
         val recognizer = if (onDevice) {
@@ -160,11 +181,11 @@ object Transcriber {
                     error == SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED ||
                         error == SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE -> {
                         if (onDevice) runCatching { recognizer.triggerModelDownload(intent) }
-                        finish(Result.Unavailable(Problem.LANGUAGE_PACK, "한국어 음성인식 언어팩이 필요합니다. 다운로드 후 '다시 분석'을 눌러주세요"))
+                        finish(Result.Unavailable(Problem.LANGUAGE_PACK, "한국어 음성인식 언어팩이 필요해요. 언어팩을 받은 뒤 '다시 분석'을 눌러 주세요"))
                     }
                     error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY ->
                         finish(Result.Unavailable(Problem.BUSY, "음성인식 엔진이 다른 작업 중이었어요"))
-                    else -> finish(Result.Unavailable(Problem.TEMPORARY, "음성인식 엔진이 응답하지 않았어요 (코드 $error)"))
+                    else -> finish(Result.Unavailable(Problem.TEMPORARY, "음성인식 엔진이 응답하지 않았어요. 잠시 뒤 '다시 분석'을 눌러 주세요"))
                 }
             }
 
