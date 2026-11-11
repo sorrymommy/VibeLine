@@ -358,7 +358,7 @@ private fun SwitchRow(title: String, subtitle: String, checked: Boolean, enabled
             enabled = enabled,
             colors = SwitchDefaults.colors(
                 checkedTrackColor = Vibe.Route, checkedThumbColor = Color.White,
-                uncheckedTrackColor = Color(0xFFCDD3CF), uncheckedThumbColor = Color.White, uncheckedBorderColor = Color.Transparent,
+                uncheckedTrackColor = Vibe.TrackOff, uncheckedThumbColor = Color.White, uncheckedBorderColor = Color.Transparent,
             ),
         )
     }

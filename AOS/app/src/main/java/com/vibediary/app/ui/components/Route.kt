@@ -97,7 +97,7 @@ fun RoundButton(
             containerColor = Color.White,
             contentColor = Vibe.Ink,
             disabledContainerColor = Color.White,
-            disabledContentColor = Color(0xFFA3ACA6),
+            disabledContentColor = Vibe.IconDisabled,
         ),
     ) { Icon(icon, contentDescription) }
 }

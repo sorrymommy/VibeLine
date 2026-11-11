@@ -394,11 +394,11 @@ private fun StationBand(entry: Entry) {
                 entry.placeName.trim() == entry.stationName -> null // "역삼동 / 역삼동에서" says nothing new
                 else -> "${entry.placeName}에서"
             }
-            sub?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = Color(0xFFC6CEC9)) }
+            sub?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = Vibe.InkMuted) }
         }
         Column(horizontalAlignment = Alignment.End) {
             Text(entry.createdAt.clock(), style = MaterialTheme.typography.titleLarge, color = Color.White)
-            Text(dateFormat.format(Date(entry.createdAt)), style = MaterialTheme.typography.labelMedium, color = Color(0xFFC6CEC9))
+            Text(dateFormat.format(Date(entry.createdAt)), style = MaterialTheme.typography.labelMedium, color = Vibe.InkMuted)
         }
     }
 }
@@ -475,7 +475,7 @@ private fun AudioPlayer(file: File, durationMs: Long) {
             progress = { if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f },
             modifier = Modifier.weight(1f).height(6.dp).clip(CircleShape),
             color = Vibe.Ink,
-            trackColor = Color(0xFFCDD3CF),
+            trackColor = Vibe.TrackOff,
             drawStopIndicator = {},
             gapSize = 0.dp,
         )

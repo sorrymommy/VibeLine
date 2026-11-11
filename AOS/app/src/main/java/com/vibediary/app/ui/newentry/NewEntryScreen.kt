@@ -150,7 +150,7 @@ fun NewEntryScreen(start: CaptureMode, appLocked: Boolean, onClose: () -> Unit, 
                 shape = RoundedCornerShape(24.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Vibe.Ink, contentColor = Color.White,
-                    disabledContainerColor = Color(0xFFCDD3CF), disabledContentColor = Color(0xFF4A544E),
+                    disabledContainerColor = Vibe.TrackOff, disabledContentColor = Vibe.TrackOffInk,
                 ),
             ) { Text(if (vm.saving) "위치 확인 중" else "노선에 추가", style = MaterialTheme.typography.labelLarge) }
         }

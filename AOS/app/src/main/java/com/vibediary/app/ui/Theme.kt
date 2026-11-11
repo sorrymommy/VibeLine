@@ -28,6 +28,10 @@ object Vibe {
     val Body = Color(0xFF2E3832)    // softer body text
     val Hairline = Color(0xFFDDE2DE)
     val Photo = Color(0xFFB9C7BE)   // photo placeholder while loading
+    val InkMuted = Color(0xFFC6CEC9)    // secondary text on Ink
+    val TrackOff = Color(0xFFCDD3CF)    // empty progress track, switch off, disabled button
+    val TrackOffInk = Color(0xFF4A544E) // text on TrackOff
+    val IconDisabled = Color(0xFFA3ACA6) // disabled icon on Card
     val Card = Color.White
 }
 
